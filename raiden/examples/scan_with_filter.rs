@@ -22,7 +22,7 @@ async fn example() {
         name: "ap-northeast-1".into(),
     });
     let filter = Scan::filter_expression(Scan::num()).eq(1000);
-    let res = client.scan().filter(filter).run().await;
+    let res = client.scan().filter(filter).limit(50).run().await;
 
     dbg!(&res);
     assert!(res.is_ok());
@@ -41,7 +41,7 @@ async fn example() {
     let sdk_client = ::raiden::Client::new(&sdk_config);
     let client = Scan::client_with(sdk_client);
     let filter = Scan::filter_expression(Scan::num()).eq(1000);
-    let res = client.scan().filter(filter).run().await;
+    let res = client.scan().filter(filter).limit(50).run().await;
 
     dbg!(&res);
     assert!(res.is_ok());

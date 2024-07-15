@@ -100,7 +100,10 @@ pub(crate) fn expand_scan(
                         .set_exclusive_start_key(Some(token.into_attr_values()?));
                 }
 
+                let mut consumed_capacity = None;
+                let mut count = 0;
                 let mut items: Vec<#struct_name> = vec![];
+                let mut scanned_count = 0;
 
                 loop {
                     if let Some(limit) = self.limit {
@@ -118,20 +121,30 @@ pub(crate) fn expand_scan(
                         }
                     };
 
-                    let scanned = res.scanned_count as i64;
+                    let current_count = res.count as i64;
+                    count += current_count;
+                    scanned_count += res.scanned_count as i64;
+                    if let Some(c) = res.consumed_capacity {
+                        consumed_capacity = if let Some(d) = consumed_capacity {
+                            Some(::raiden::ops::consumed_capacity::extend_consumed_capacity(d, c))
+                        } else {
+                            Some(c)
+                        };
+                    }
 
                     let mut has_next = true;
                     if let Some(limit) = self.limit {
-                        has_next = limit - scanned > 0;
-                        self.limit = Some(limit - scanned);
+                        has_next = limit - current_count > 0;
+                        self.limit = Some(limit - current_count);
                     }
+
                     if res.last_evaluated_key.is_none() || !has_next {
                         return Ok(::raiden::scan::ScanOutput {
-                            consumed_capacity: res.consumed_capacity,
-                            count: Some(res.count as i64),
+                            consumed_capacity,
+                            count: Some(count),
                             items,
                             last_evaluated_key: res.last_evaluated_key,
-                            scanned_count: Some(res.scanned_count as i64),
+                            scanned_count: Some(scanned_count),
                         })
                     }
 

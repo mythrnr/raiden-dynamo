@@ -131,7 +131,11 @@ pub(crate) fn expand_query(
                     self.input.exclusive_start_key = Some(token.into_attr_values()?);
                 }
 
+                let mut consumed_capacity = None;
+                let mut count = 0;
                 let mut items: Vec<#struct_name> = vec![];
+                let mut scanned_count = 0;
+
                 let policy: ::raiden::RetryPolicy = self.policy.into();
                 let client = self.client;
 
@@ -158,12 +162,21 @@ pub(crate) fn expand_query(
                         }
                     };
 
-                    let scanned = &res.scanned_count.unwrap_or(0);
+                    let current_count = res.count.unwrap_or(0);
+                    count += current_count;
+                    scanned_count += res.scanned_count.unwrap_or(0);
+                    if let Some(c) = res.consumed_capacity {
+                        consumed_capacity = if let Some(d) = consumed_capacity {
+                            Some(::raiden::ops::consumed_capacity::extend_consumed_capacity(d, c))
+                        } else {
+                            Some(c)
+                        };
+                    }
 
                     let mut has_next = true;
                     if let Some(limit) = self.limit {
-                        has_next = limit - scanned > 0;
-                        self.limit = Some(limit - scanned);
+                        has_next = limit - current_count > 0;
+                        self.limit = Some(limit - current_count);
                     }
 
                     if res.last_evaluated_key.is_none() || !has_next {
@@ -173,11 +186,11 @@ pub(crate) fn expand_query(
                             None
                         };
                         return Ok(::raiden::query::QueryOutput {
-                            consumed_capacity: res.consumed_capacity,
-                            count: res.count,
+                            consumed_capacity,
+                            count: Some(count),
                             items,
                             next_token,
-                            scanned_count: res.scanned_count,
+                            scanned_count: Some(scanned_count),
                         })
                     }
                     self.input.exclusive_start_key = res.last_evaluated_key;
